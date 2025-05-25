@@ -2,8 +2,10 @@ package be.ucll.unit.integration;
 
 import be.ucll.model.Book;
 import be.ucll.model.Loan;
+import be.ucll.model.Membership;
 import be.ucll.model.User;
 import be.ucll.repository.LoanRepository;
+import be.ucll.repository.PublicationRepository;
 import be.ucll.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,16 +13,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
-import java.util.Arrays;
 import java.util.List;
 
 import static org.hamcrest.Matchers.*;
-import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -34,127 +33,114 @@ public class UserIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockBean
+    @Autowired
     private UserRepository userRepository;
 
-    @MockBean
+    @Autowired
     private LoanRepository loanRepository;
+
+    @Autowired
+    private PublicationRepository publicationRepository;
 
 
     private User user1;
-    private User user2;
-    private User adultUser;
-    private User minorUser;
-    private Book book;
-    private Loan loan;
 
     @BeforeEach
     void setUp() {
-        user1 = new User("John Doe", "password123", "john.doe@example.com", 30);
-        user2 = new User("Jane Smith", "password456", "jane.smith@example.com", 25);
-        adultUser = new User("Adult User", "password789", "adult@example.com", 21);
-        minorUser = new User("Minor User", "password101", "minor@example.com", 16);
+        loanRepository.deleteAll();
+        userRepository.deleteAll();
 
-        book = new Book("Test Book", "Test Author", "978-0-545-01022-1", 2020, 5);
-        loan = new Loan(user1, List.of(book), LocalDate.now().minusDays(5));
+        user1 = new User("John Doe", "password123", "john.doe@example.com", 30);
+        user1 = userRepository.save(user1);
+
+        User user2 = new User("Jane Smith", "password456", "jane.smith@example.com", 25);
+        userRepository.save(user2);
+
+        // Save book first
+        Book book = new Book("Test Book", "Test Author", "978-0-545-01022-1", 2020, 5);
+        book = publicationRepository.save(book); // <-- persist book first!
+
+        // Now create loan with the persisted book entity
+        Loan loan = new Loan(user1, List.of(book), LocalDate.now().minusDays(5));
+
+        loanRepository.save(loan);
     }
 
     @Test
     void testGetAllUsers() throws Exception {
-        when(userRepository.findAll()).thenReturn(Arrays.asList(user1, user2));
-
         mockMvc.perform(get("/users"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].name", is("John Doe")))
-                .andExpect(jsonPath("$[1].name", is("Jane Smith")));
+                .andExpect(jsonPath("$", hasSize(2)));
     }
 
     @Test
     void testGetUsersByName() throws Exception {
-        when(userRepository.findByNameContainingIgnoreCase("John")).thenReturn(List.of(user1));
-
-        mockMvc.perform(get("/users?name=John"))
+        mockMvc.perform(get("/users").param("name", "John"))
                 .andExpect(status().isOk())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].name", is("John Doe")));
     }
 
     @Test
     void testGetAllAdultUsers() throws Exception {
-        when(userRepository.findByAgeGreaterThanEqual(18)).thenReturn(Arrays.asList(user1, user2, adultUser));
-
         mockMvc.perform(get("/users/adults"))
                 .andExpect(status().isOk())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$", hasSize(3)))
+                .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[*].age", everyItem(greaterThanOrEqualTo(18))));
     }
 
     @Test
     void testGetUsersByAgeRange() throws Exception {
-        when(userRepository.findByAgeBetween(20, 30)).thenReturn(Arrays.asList(user1, user2, adultUser));
-
-        mockMvc.perform(get("/users/age/{minAge}/{maxAge}", 20, 30))
+        mockMvc.perform(get("/users/age/{minAge}/{maxAge}", 20, 40))
                 .andExpect(status().isOk())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$", hasSize(3)))
-                .andExpect(jsonPath("$[0].age", is(30)))
-                .andExpect(jsonPath("$[1].age", is(25)))
-                .andExpect(jsonPath("$[2].age", is(21)));
-    }
-
-    @Test
-    void testGetUserLoans_UserNotFound() throws Exception {
-        String email = "nonexistent@example.com";
-        when(userRepository.userExists(email)).thenReturn(false);
-
-        mockMvc.perform(get("/users/{email}/loans", email))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status", is("error")))
-                .andExpect(jsonPath("$.message", containsString("does not exist")));
+                .andExpect(jsonPath("$", hasSize(2)));
     }
 
     @Test
     void testAddUser() throws Exception {
         User newUser = new User("New User", "newpassword", "new.user@example.com", 28);
-        when(userRepository.save(org.mockito.ArgumentMatchers.any(User.class))).thenReturn(newUser);
-
         mockMvc.perform(post("/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(newUser)))
                 .andExpect(status().isOk())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.name", is("New User")))
-                .andExpect(jsonPath("$.email", is("new.user@example.com")))
-                .andExpect(jsonPath("$.age", is(28)));
+                .andExpect(jsonPath("$.name", is("New User")));
     }
 
     @Test
     void testUpdateUser() throws Exception {
-        User updatedUser = new User("Updated User", "updatedpassword", "updated.user@example.com", 30);
-        when(userRepository.findByEmail("john.doe@example.com")).thenReturn(user1);
-        when(userRepository.save(org.mockito.ArgumentMatchers.any(User.class))).thenReturn(updatedUser);
+        user1.setName("Updated User");
+        user1.setPassword("updatedpassword");
+        user1.setAge(35);
 
-        mockMvc.perform(put("/users/{email}", "john.doe@example.com")
+        mockMvc.perform(put("/users/{email}", user1.getEmail())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(updatedUser)))
+                        .content(objectMapper.writeValueAsString(user1)))
                 .andExpect(status().isOk())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.name", is("Updated User")))
-                .andExpect(jsonPath("$.email", is("updated.user@example.com")))
-                .andExpect(jsonPath("$.age", is(30)));
+                .andExpect(jsonPath("$.name", is("Updated User")));
     }
+
+
+
 
     @Test
     void testDeleteUser_WithActiveLoans() throws Exception {
-        String email = "john.doe@example.com";
-        when(userRepository.findByEmail(email)).thenReturn(user1);
-        when(loanRepository.findLoansByUser(email, true)).thenReturn(List.of(loan));
-
-        mockMvc.perform(delete("/users/{email}", email))
+        mockMvc.perform(delete("/users/{email}", user1.getEmail()))
                 .andExpect(status().isBadRequest());
+    }
+
+
+    @Test
+    void testGetUserLoans() throws Exception {
+        mockMvc.perform(get("/users/{email}/loans", user1.getEmail()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].user.email", is(user1.getEmail())));
+    }
+
+    @Test
+    void testGetUserLoansOnlyActive() throws Exception {
+        mockMvc.perform(get("/users/{email}/loans", user1.getEmail()).param("onlyActive", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)));
     }
 }

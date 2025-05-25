@@ -6,8 +6,8 @@ import be.ucll.model.Publication;
 import be.ucll.repository.PublicationRepository;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class PublicationService {
@@ -18,64 +18,47 @@ public class PublicationService {
     }
 
     public List<Publication> findPublicationsByTitleAndType(String title, String type) {
-        List<Publication> result = new ArrayList<>();
+        List<Publication> filteredPublications;
 
-        // Case 1: No filters provided, return all publications
-        if ((title == null || title.isEmpty()) && (type == null || type.isEmpty())) {
-            return publicationRepository.findAll();
+        // Filter by title using repository method if provided, else get all
+        if (title == null || title.isEmpty()) {
+            filteredPublications = publicationRepository.findAll();
+        } else {
+            filteredPublications = publicationRepository.findByTitleContainingIgnoreCase(title);
         }
 
-        // Case 2: Only title filter provided
-        if ((title != null && !title.isEmpty()) && (type == null || type.isEmpty())) {
-            result.addAll(publicationRepository.findBooksByTitle(title));
-            result.addAll(publicationRepository.findMagazinesByTitle(title));
-            return result;
-        }
-
-        // Case 3: Only type filter provided
-        if ((title == null || title.isEmpty()) && (type != null && !type.isEmpty())) {
-            if (type.equalsIgnoreCase("Book")) {
-                result.addAll(publicationRepository.findAll().stream()
-                        .filter(p -> p instanceof Book)
-                        .toList());
-            } else if (type.equalsIgnoreCase("Magazine")) {
-                result.addAll(publicationRepository.findAll().stream()
-                        .filter(p -> p instanceof Magazine)
-                        .toList());
-            }
-            return result;
-        }
-
-        // Case 4: Both title and type filters provided
-        if (type.equalsIgnoreCase("Book")) {
-            result.addAll(publicationRepository.findBooksByTitle(title));
+        // Filter by type in memory if type filter provided
+        if (type == null || type.isEmpty()) {
+            return filteredPublications;
+        } else if (type.equalsIgnoreCase("Book")) {
+            return filteredPublications.stream()
+                    .filter(p -> p instanceof Book)
+                    .collect(Collectors.toList());
         } else if (type.equalsIgnoreCase("Magazine")) {
-            result.addAll(publicationRepository.findMagazinesByTitle(title));
+            return filteredPublications.stream()
+                    .filter(p -> p instanceof Magazine)
+                    .collect(Collectors.toList());
+        } else {
+            return List.of(); // Unsupported type returns empty list
         }
-
-        return result;
     }
 
-    // Method to find publications by available copies
     public List<Publication> findPublicationsByAvailableCopies(int availableCopies) {
-        return publicationRepository.findByAvailableCopies(availableCopies);
+        return publicationRepository.findByAvailableCopiesGreaterThanEqual(availableCopies);
     }
 
     public Book addBook(Book book) {
-        return publicationRepository.addBook(book);
+        return publicationRepository.save(book);
     }
 
     public Magazine addMagazine(Magazine magazine) {
-        return publicationRepository.addMagazine(magazine);
+        return publicationRepository.save(magazine);
     }
 
     public Publication savePublication(Publication publication) {
-        if (publication instanceof Book) {
-            return publicationRepository.addBook((Book) publication);
-        } else if (publication instanceof Magazine) {
-            return publicationRepository.addMagazine((Magazine) publication);
-        } else {
-            throw new IllegalArgumentException("Unsupported publication type: " + publication.getClass().getSimpleName());
+        if (publication instanceof Book || publication instanceof Magazine) {
+            return publicationRepository.save(publication);
         }
+        throw new IllegalArgumentException("Unsupported publication type: " + publication.getClass().getSimpleName());
     }
 }

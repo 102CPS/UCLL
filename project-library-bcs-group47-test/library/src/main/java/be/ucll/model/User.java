@@ -1,9 +1,15 @@
 package be.ucll.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
+@Table(name = "users")
 public class User {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -24,7 +30,12 @@ public class User {
     @JoinColumn(name = "profile_id")
     private Profile profile;
 
-    // Constructor with validation
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
+    private Set<Membership> memberships;
+
+    public User() {}
+
     public User(String name, String password, String email, int age) {
         setName(name);
         setPassword(password);
@@ -32,13 +43,11 @@ public class User {
         setAge(age);
     }
 
-    // Constructor with profile
     public User(String name, String password, String email, int age, Profile profile) {
         this(name, password, email, age);
         setProfile(profile);
     }
 
-    // Getters
     public Long getId() {
         return id;
     }
@@ -63,7 +72,10 @@ public class User {
         return profile;
     }
 
-    // Setters
+    public Set<Membership> getMemberships() {
+        return memberships;
+    }
+
     public void setId(Long id) {
         this.id = id;
     }
@@ -83,6 +95,9 @@ public class User {
     }
 
     public void setEmail(String email) {
+        if (this.email != null) {
+            throw new IllegalArgumentException("Email cannot be changed.");
+        }
         if (email == null || !email.contains("@") || !email.contains(".")) {
             throw new IllegalArgumentException("E-mail must be a valid format.");
         }
@@ -106,6 +121,15 @@ public class User {
         }
     }
 
-    // Default constructor for JPA
-    public User() {}
+    public void setMemberships(Set<Membership> memberships) {
+        this.memberships = memberships;
+    }
+
+    public void addMembership(Membership membership) {
+        if (memberships == null) {
+            memberships = new HashSet<>();
+        }
+        memberships.add(membership);
+        membership.setUser(this);
+    }
 }

@@ -1,7 +1,9 @@
 package be.ucll.model;
 
+import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 
+@Entity
 public class Magazine extends Publication {
 
     @NotBlank(message = "Editor is required.")
@@ -10,10 +12,7 @@ public class Magazine extends Publication {
     @NotBlank(message = "ISSN is required.")
     private String issn;
 
-    // No-args constructor for JSON deserialization
-    public Magazine() {
-        super();
-    }
+    public Magazine() { super(); }
 
     public Magazine(String title, String editor, String issn, int publicationYear, int availableCopies) {
         super(title, publicationYear, availableCopies);
@@ -21,16 +20,9 @@ public class Magazine extends Publication {
         setIssn(issn);
     }
 
-    // Getters
-    public String getEditor() {
-        return editor;
-    }
+    public String getEditor() { return editor; }
+    public String getIssn() { return issn; }
 
-    public String getIssn() {
-        return issn;
-    }
-
-    // Setters with validation
     public void setEditor(String editor) {
         if (editor == null || editor.trim().isEmpty()) {
             throw new IllegalArgumentException("Editor is required.");

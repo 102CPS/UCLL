@@ -1,9 +1,16 @@
 package be.ucll.model;
 
+import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.time.LocalDate;
 
+@Entity
+@Inheritance(strategy = InheritanceType.JOINED)
 public abstract class Publication {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
     @NotBlank(message = "Title is required")
     private String title;
@@ -16,10 +23,7 @@ public abstract class Publication {
     @Min(value = 0, message = "Available copies cannot be negative.")
     private Integer availableCopies;
 
-    // No-args constructor for JSON deserialization
-    protected Publication() {
-        // Empty constructor, fields will be set via setters or reflection
-    }
+    protected Publication() {}
 
     public Publication(String title, int publicationYear, int availableCopies) {
         setTitle(title);
@@ -27,20 +31,11 @@ public abstract class Publication {
         setAvailableCopies(availableCopies);
     }
 
-    // Getters
-    public String getTitle() {
-        return title;
-    }
+    public Long getId() { return id; }
+    public String getTitle() { return title; }
+    public int getPublicationYear() { return publicationYear; }
+    public int getAvailableCopies() { return availableCopies; }
 
-    public int getPublicationYear() {
-        return publicationYear;
-    }
-
-    public int getAvailableCopies() {
-        return availableCopies;
-    }
-
-    // Setters with functional validation that can't be done with annotations
     public void setTitle(String title) {
         if (title == null || title.trim().isEmpty()) {
             throw new IllegalArgumentException("Title is required");
@@ -49,7 +44,6 @@ public abstract class Publication {
     }
 
     public void setPublicationYear(int publicationYear) {
-        // Custom validation for future years (can't be done with annotations easily)
         if (publicationYear < 0 || publicationYear > LocalDate.now().getYear()) {
             throw new IllegalArgumentException("Publication year must be a positive integer and not in the future.");
         }

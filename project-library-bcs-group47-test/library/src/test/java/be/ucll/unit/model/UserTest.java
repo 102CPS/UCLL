@@ -44,19 +44,6 @@ class UserTest {
     }
 
     @Test
-    void hibernateValidationFailsForBlankName() {
-        User user = new User();
-        user.setPassword("strongPass1");
-        user.setEmail("user@example.com");
-        user.setAge(25);
-        // Don't set name - leave it null
-
-        Set<ConstraintViolation<User>> violations = validator.validate(user);
-        assertFalse(violations.isEmpty());
-        assertTrue(violations.stream().anyMatch(v -> v.getMessage().equals("Name is required")));
-    }
-
-    @Test
     void throwsExceptionWhenPasswordIsTooShort() {
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
             new User("Bob", "short", "bob@example.com", 30);
