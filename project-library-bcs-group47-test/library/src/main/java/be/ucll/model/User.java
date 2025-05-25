@@ -1,35 +1,28 @@
 package be.ucll.model;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.*;
 
 @Entity
-@Table(name = "users")
 public class User {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotBlank(message = "Name is required")
     @Column(nullable = false)
     private String name;
 
-    @NotBlank(message = "Password must be at least 8 characters long.")
-    @Size(min = 8, message = "Password must be at least 8 characters long.")
     @Column(nullable = false)
     private String password;
 
-    @NotBlank(message = "E-mail must be a valid format.")
-    @Pattern(regexp = ".*@.*\\..*", message = "E-mail must be a valid format.")
     @Column(nullable = false, unique = true)
     private String email;
 
-    @NotNull(message = "Age must be between 0 and 101.")
-    @Min(value = 0, message = "Age must be between 0 and 101.")
-    @Max(value = 101, message = "Age must be between 0 and 101.")
     @Column(nullable = false)
-    private Integer age;
+    private int age;
+
+    @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JoinColumn(name = "profile_id")
+    private Profile profile;
 
     // Constructor with validation
     public User(String name, String password, String email, int age) {
@@ -39,8 +32,11 @@ public class User {
         setAge(age);
     }
 
-    // Default constructor (required by JPA)
-    public User() {}
+    // Constructor with profile
+    public User(String name, String password, String email, int age, Profile profile) {
+        this(name, password, email, age);
+        setProfile(profile);
+    }
 
     // Getters
     public Long getId() {
@@ -63,7 +59,11 @@ public class User {
         return age;
     }
 
-    // Setters with validation (keeping functional validation that can't be done with annotations)
+    public Profile getProfile() {
+        return profile;
+    }
+
+    // Setters
     public void setId(Long id) {
         this.id = id;
     }
@@ -83,11 +83,6 @@ public class User {
     }
 
     public void setEmail(String email) {
-        // Story 15 requirement: Email cannot be changed after creation
-        if (this.email != null && !this.email.equals(email)) {
-            throw new IllegalArgumentException("Email cannot be changed.");
-        }
-
         if (email == null || !email.contains("@") || !email.contains(".")) {
             throw new IllegalArgumentException("E-mail must be a valid format.");
         }
@@ -101,26 +96,16 @@ public class User {
         this.age = age;
     }
 
-    @Override
-    public String toString() {
-        return "User{" +
-                "id=" + id +
-                ", name='" + name + '\'' +
-                ", email='" + email + '\'' +
-                ", age=" + age +
-                '}';
+    public void setProfile(Profile profile) {
+        if (profile != null && this.age < 18) {
+            throw new IllegalArgumentException("User must be at least 18 years old to have a profile.");
+        }
+        this.profile = profile;
+        if (profile != null) {
+            profile.setUser(this);
+        }
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof User)) return false;
-        User user = (User) o;
-        return email != null && email.equals(user.email);
-    }
-
-    @Override
-    public int hashCode() {
-        return email != null ? email.hashCode() : 0;
-    }
+    // Default constructor for JPA
+    public User() {}
 }

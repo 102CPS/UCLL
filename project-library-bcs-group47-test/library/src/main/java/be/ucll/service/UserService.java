@@ -5,12 +5,11 @@ import be.ucll.model.User;
 import be.ucll.repository.LoanRepository;
 import be.ucll.repository.UserRepository;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
-@Transactional
 public class UserService {
 
     private final UserRepository userRepository;
@@ -55,28 +54,26 @@ public class UserService {
         return userRepository.findAll();
     }
 
-    // Find user by email
+    // Find user by email - returns User or null for backward compatibility
     public User findUserByEmail(String email) {
         return userRepository.findByEmail(email).orElse(null);
     }
 
-    // Story 14 - Add a new user or update existing user
+    // Story 22 - Add a new user with optional profile
     public User addUser(User user) {
-        // Check if user already exists (for new users)
-        if (user.getId() == null && userRepository.existsByEmail(user.getEmail())) {
+        // Check if user already exists - use isPresent() for Optional
+        if (userRepository.findByEmail(user.getEmail()).isPresent()) {
             throw new IllegalArgumentException("User already exists.");
         }
+
         return userRepository.save(user);  // Save the user and return the saved entity
     }
 
     // Story 17 - Delete User
-    @Transactional
     public String deleteUser(String email) {
-        // Check if user exists
-        User user = userRepository.findByEmail(email).orElse(null);
-        if (user == null) {
-            throw new UserNotFoundException("User does not exist.");
-        }
+        // Check if user exists - use orElseThrow for Optional
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException("User does not exist."));
 
         // Check if user has active loans
         List<Loan> activeLoans = loanRepository.findLoansByUser(email, true);
